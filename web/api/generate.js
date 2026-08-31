@@ -35,9 +35,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  const baseUrl = (process.env.LLM_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+  const baseUrl = (process.env.LLM_BASE_URL || 'https://opencode.ai/zen/go/v1').replace(/\/$/, '');
   const apiKey = process.env.LLM_API_KEY;
-  const model = process.env.LLM_MODEL || 'gpt-4o';
+  const model = process.env.LLM_MODEL || 'deepseek-v4-pro';
 
   if (!apiKey) {
     res.status(500).json({ error: 'LLM_API_KEY no configurado en Vercel' });

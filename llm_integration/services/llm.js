@@ -1,9 +1,9 @@
 const OpenAI = require('openai');
 const logger = require('../utils/logger');
 
-const BASE_URL = process.env.LLM_BASE_URL || 'https://api.openai.com/v1';
+const BASE_URL = process.env.LLM_BASE_URL || 'https://opencode.ai/zen/go/v1';
 const API_KEY = process.env.LLM_API_KEY;
-const MODEL = process.env.LLM_MODEL || 'gpt-4o';
+const MODEL = process.env.LLM_MODEL || 'deepseek-v4-pro';
 
 let client = null;
 

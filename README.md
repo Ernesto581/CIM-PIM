@@ -41,9 +41,9 @@ La metódica (prompts) vive en:
    - `VITE_SUPABASE_URL` = `https://<ref>.supabase.co`
    - `VITE_SUPABASE_ANON_KEY` = tu publishable key (`sb_publishable_...`)
    - `VITE_PLANTUML_URL` = `https://www.plantuml.com/plantuml` (opcional)
-   - `LLM_API_KEY` = tu clave de IA
-   - `LLM_BASE_URL` = `https://api.openai.com/v1` (o tu gateway)
-   - `LLM_MODEL` = `gpt-4o`
+   - `LLM_API_KEY` = tu clave de IA (OpenCode Go: `sk-...`)
+   - `LLM_BASE_URL` = `https://opencode.ai/zen/go/v1`
+   - `LLM_MODEL` = `deepseek-v4-pro`
 4. Deploy.
 
 > La función `/api/generate` se despliega automáticamente con Vercel y mantiene la clave de IA en secreto.
