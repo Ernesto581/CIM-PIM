@@ -1,0 +1,73 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: jmda_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - api_net
+    restart: unless-stopped
+
+  plantuml:
+    image: plantuml/plantuml-server:jetty
+    container_name: jmda_plantuml
+    ports:
+      - "8080:8080"
+    networks:
+      - api_net
+    restart: unless-stopped
+
+  manager_service:
+    build: ./manager_service
+    container_name: jmda_manager
+    ports:
+      - "3003:3003"
+    depends_on:
+      - mongo
+    networks:
+      - api_net
+    env_file:
+      - manager_service/.env
+    restart: unless-stopped
+
+  llm_integration:
+    build: ./llm_integration
+    container_name: jmda_llm
+    ports:
+      - "3002:3002"
+    networks:
+      - api_net
+    env_file:
+      - llm_integration/.env
+    restart: unless-stopped
+
+  api_gateway:
+    build: ./api_gateway
+    container_name: jmda_gateway
+    ports:
+      - "3001:3001"
+    depends_on:
+      - manager_service
+      - llm_integration
+    networks:
+      - api_net
+    restart: unless-stopped
+
+  client_app:
+    build: ./client_app
+    container_name: jmda_client
+    ports:
+      - "3000:80"
+    depends_on:
+      - api_gateway
+    networks:
+      - api_net
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+
+networks:
+  api_net:
