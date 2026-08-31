@@ -146,20 +146,17 @@ export default function Wizard() {
   const generate = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate', {
-        body: { requisitos: requisitosInput(), etapa: stage.id }
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requisitos: requisitosInput(), etapa: stage.id })
       });
-      if (error) {
-        let msg = error.message;
-        try {
-          msg = (await error.context.json()).error || msg;
-        } catch {
-          /* ignore */
-        }
-        throw new Error(msg);
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload.error || 'Error al generar');
       }
-      const content = data?.markdown || '';
-      const umlCode = data?.uml || '';
+      const content = payload.markdown || '';
+      const umlCode = payload.uml || '';
       setMarkdown(content);
       setUml(umlCode);
       await persist(content, umlCode);
