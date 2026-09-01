@@ -1,0 +1,219 @@
+:root {
+  --ink: #0d1117;
+  --surface: #141b24;
+  --paper: #f4efe4;
+  --paper-ink: #23262b;
+  --copper: #e0a45c;
+  --blue: #6c93e8;
+  --muted: #93a0b0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: 'Sora', sans-serif;
+  color: #eae6dc;
+  background-color: var(--ink);
+  background-image:
+    radial-gradient(1200px 600px at 80% -10%, rgba(108, 147, 232, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 0% 110%, rgba(224, 164, 92, 0.07), transparent 55%),
+    linear-gradient(rgba(234, 230, 220, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(234, 230, 220, 0.022) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgba(224, 164, 92, 0.35);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #263140;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #34445a;
+  background-clip: content-box;
+}
+
+/* ---------- Surfaces ---------- */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.serif-display {
+  font-family: 'Fraunces', serif;
+  letter-spacing: -0.02em;
+}
+
+.eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--copper);
+}
+
+/* "Paper" surfaces: the drafting-table contrast (light editor/diagram on dark chrome) */
+.paper {
+  background: var(--paper);
+  color: var(--paper-ink);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.paper textarea,
+.paper .MuiInputBase-root {
+  color: var(--paper-ink) !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+}
+
+.paper-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8a8375;
+}
+
+/* ---------- Markdown ---------- */
+.markdown-body {
+  line-height: 1.65;
+  color: var(--paper-ink);
+  font-size: 14px;
+}
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  font-family: 'Fraunces', serif;
+  color: #17181c;
+  margin: 1.1em 0 0.4em;
+  line-height: 1.2;
+}
+.markdown-body h2 {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding-bottom: 0.25em;
+}
+.markdown-body h1:first-child,
+.markdown-body h2:first-child {
+  margin-top: 0;
+}
+.markdown-body p {
+  margin: 0.5em 0;
+}
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.4em;
+  margin: 0.5em 0;
+}
+.markdown-body li {
+  margin: 0.2em 0;
+}
+.markdown-body code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+.markdown-body pre {
+  background: #171b22;
+  color: #e6e1d6;
+  padding: 14px;
+  border-radius: 10px;
+  overflow-x: auto;
+}
+.markdown-body pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.7em 0;
+}
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  padding: 6px 10px;
+  text-align: left;
+}
+.markdown-body strong {
+  color: #17181c;
+}
+
+/* ---------- Motion ---------- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise 0.5s ease both;
+}
+.rise-1 {
+  animation-delay: 0.03s;
+}
+.rise-2 {
+  animation-delay: 0.08s;
+}
+.rise-3 {
+  animation-delay: 0.13s;
+}
+.rise-4 {
+  animation-delay: 0.18s;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+.shimmer {
+  background: linear-gradient(90deg, rgba(234, 230, 220, 0.04) 25%, rgba(234, 230, 220, 0.1) 50%, rgba(234, 230, 220, 0.04) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.pulse-dot {
+  animation: pulse-dot 1s ease-in-out infinite;
+}

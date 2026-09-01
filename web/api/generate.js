@@ -1,5 +1,7 @@
 import { method } from './method.js';
 
+export const maxDuration = 60;
+
 function extractUml(markdown) {
   const codeBlock =
     markdown.match(/```plantuml\s*([\s\S]*?)```/i) ||
