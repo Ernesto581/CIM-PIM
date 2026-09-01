@@ -297,7 +297,7 @@ export default function Wizard() {
             </Button>
             {loading && (
               <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
-                El modelo razona antes de responder; puede tardar entre 10 y 60 s.
+                Generando… normalmente tarda entre 10 y 20 s.
               </Typography>
             )}
           </Stack>

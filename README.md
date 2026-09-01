@@ -44,6 +44,7 @@ La metódica (prompts) vive en:
    - `LLM_API_KEY` = tu clave de IA (OpenCode Go: `sk-...`)
    - `LLM_BASE_URL` = `https://opencode.ai/zen/go/v1`
    - `LLM_MODEL` = `deepseek-v4-pro`
+   - `LLM_REASONING_EFFORT` = `none` (importante: evita el timeout de ~60s)
 4. Deploy.
 
 > La función `/api/generate` se despliega automáticamente con Vercel y mantiene la clave de IA en secreto.

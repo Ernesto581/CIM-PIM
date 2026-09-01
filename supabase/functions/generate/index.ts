@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
     const baseUrl = Deno.env.get('LLM_BASE_URL') || 'https://opencode.ai/zen/go/v1';
     const apiKey = Deno.env.get('LLM_API_KEY');
     const model = Deno.env.get('LLM_MODEL') || 'deepseek-v4-pro';
+    const reasoningEffort = Deno.env.get('LLM_REASONING_EFFORT') || 'none';
 
     if (!apiKey) {
       return new Response(JSON.stringify({ error: 'LLM_API_KEY no está configurado en la función' }), {
@@ -63,6 +64,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model,
+        reasoning_effort: reasoningEffort,
         temperature: 0.1,
         messages: [
           { role: 'system', content: system },

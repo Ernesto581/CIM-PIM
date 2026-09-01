@@ -4,6 +4,7 @@ const logger = require('../utils/logger');
 const BASE_URL = process.env.LLM_BASE_URL || 'https://opencode.ai/zen/go/v1';
 const API_KEY = process.env.LLM_API_KEY;
 const MODEL = process.env.LLM_MODEL || 'deepseek-v4-pro';
+const REASONING_EFFORT = process.env.LLM_REASONING_EFFORT || 'none';
 
 let client = null;
 
@@ -21,6 +22,7 @@ async function generate({ system, user, temperature = 0.1 }) {
   const openai = getClient();
   const response = await openai.chat.completions.create({
     model: MODEL,
+    reasoning_effort: REASONING_EFFORT,
     temperature,
     messages: [
       { role: 'system', content: system },
