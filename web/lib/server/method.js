@@ -1,4 +1,4 @@
-// Metódica CIM-PIM (prompts) para la función serverless de Vercel.
+// Metódica CIM-PIM (prompts) para las funciones serverless de Vercel.
 // Fuente de verdad: llm_integration/prompts/method.json
 
 export const method = {

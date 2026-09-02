@@ -21,6 +21,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SaveIcon from '@mui/icons-material/Save';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PlantUMLViewer from '../components/PlantUMLViewer';
@@ -56,6 +57,29 @@ function upsertEtapa(etapas, etapa) {
   return list;
 }
 
+function extractUml(markdown) {
+  const codeBlock =
+    markdown.match(/```plantuml\s*([\s\S]*?)```/i) ||
+    markdown.match(/```(?:text|uml)?\s*(@startuml[\s\S]*?@enduml)\s*```/i);
+  if (codeBlock) return codeBlock[1].trim();
+  const inline = markdown.match(/(@startuml[\s\S]*?@enduml)/i);
+  if (inline) return inline[1].trim();
+  return '';
+}
+
+async function readStream(res, setText) {
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let full = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    full += decoder.decode(value, { stream: true });
+    setText(full);
+  }
+  return full;
+}
+
 export default function Wizard() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -71,6 +95,8 @@ export default function Wizard() {
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState('edit');
   const [snack, setSnack] = useState('');
+  const [validating, setValidating] = useState(false);
+  const [report, setReport] = useState('');
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -145,9 +171,10 @@ export default function Wizard() {
   const generate = async () => {
     setLoading(true);
     setElapsed(0);
+    setMarkdown('');
     timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120000);
+    const timeout = setTimeout(() => controller.abort(), 180000);
 
     try {
       const res = await fetch('/api/generate', {
@@ -156,16 +183,20 @@ export default function Wizard() {
         body: JSON.stringify({ requisitos: requisitosInput(), etapa: stage.id }),
         signal: controller.signal
       });
-      let payload;
-      try {
-        payload = await res.json();
-      } catch {
-        throw new Error('La función /api/generate no respondió JSON. ¿Estás en local? Usa `vercel dev`.');
+
+      if (!res.ok || !res.body) {
+        let msg = 'Error al generar';
+        try {
+          const j = await res.json();
+          msg = j.error || msg;
+        } catch {
+          /* ignore */
+        }
+        throw new Error(msg);
       }
-      if (!res.ok) throw new Error(payload.error || 'Error al generar');
-      const content = payload.markdown || '';
-      const umlCode = payload.uml || '';
-      setMarkdown(content);
+
+      const content = await readStream(res, setMarkdown);
+      const umlCode = extractUml(content);
       setUml(umlCode);
       await persist(content, umlCode);
       setSnack(`${stage.nombre} generado con IA`);
@@ -176,6 +207,42 @@ export default function Wizard() {
       clearTimeout(timeout);
       if (timerRef.current) clearInterval(timerRef.current);
       setLoading(false);
+    }
+  };
+
+  const validate = async () => {
+    setValidating(true);
+    setReport('');
+    const modelos = stages.map((s) => {
+      const e = findEtapa(proyecto?.etapas, s.id);
+      return { nombre: s.nombre, contenido: e?.contenido || '', uml: e?.uml || '' };
+    });
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 180000);
+    try {
+      const res = await fetch('/api/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requisitos: requisitosInput(), modelos }),
+        signal: controller.signal
+      });
+      if (!res.ok || !res.body) {
+        let msg = 'Error al validar';
+        try {
+          const j = await res.json();
+          msg = j.error || msg;
+        } catch {
+          /* ignore */
+        }
+        throw new Error(msg);
+      }
+      await readStream(res, setReport);
+    } catch (e) {
+      setReport(e.name === 'AbortError' ? 'La validación tardó demasiado.' : e.message || 'Error al validar');
+    } finally {
+      clearTimeout(timeout);
+      setValidating(false);
     }
   };
 
@@ -197,11 +264,22 @@ export default function Wizard() {
         Proyectos
       </Button>
 
-      <Box className="rise" sx={{ mb: 3 }}>
-        <Typography className="eyebrow">Proyecto</Typography>
-        <Typography className="serif-display" sx={{ fontSize: 34, color: '#eae6dc' }}>
-          {proyecto.nombre}
-        </Typography>
+      <Box className="rise" sx={{ mb: 3, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+        <Box>
+          <Typography className="eyebrow">Proyecto</Typography>
+          <Typography className="serif-display" sx={{ fontSize: 34, color: '#eae6dc' }}>
+            {proyecto.nombre}
+          </Typography>
+        </Box>
+        <Button
+          variant="outlined"
+          startIcon={validating ? <CircularProgress size={16} color="inherit" /> : <FactCheckIcon />}
+          onClick={validate}
+          disabled={validating || loading}
+          sx={{ mb: 1 }}
+        >
+          {validating ? 'Validando…' : 'Validar coherencia'}
+        </Button>
       </Box>
 
       {/* Idea */}
@@ -292,50 +370,54 @@ export default function Wizard() {
             >
               {loading ? `Generando… ${elapsed}s` : 'Generar con IA'}
             </Button>
-            <Button variant="outlined" startIcon={<SaveIcon />} onClick={saveStage} disabled={saving}>
+            <Button variant="outlined" startIcon={<SaveIcon />} onClick={saveStage} disabled={saving || loading}>
               Guardar
             </Button>
-            {loading && (
-              <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
-                Generando… normalmente tarda entre 10 y 20 s.
-              </Typography>
-            )}
           </Stack>
 
-          {/* Markdown editor / preview */}
-          <Box sx={{ mb: 3 }}>
-            <ToggleButtonGroup value={mode} exclusive onChange={(e, v) => v && setMode(v)} size="small" sx={{ mb: 1.5 }}>
-              <ToggleButton value="edit">Editar</ToggleButton>
-              <ToggleButton value="preview">Vista previa</ToggleButton>
-            </ToggleButtonGroup>
+          {/* Markdown */}
+          {loading ? (
+            <Box sx={{ mb: 3 }}>
+              <Typography className="eyebrow" sx={{ mb: 1 }}>
+                Generando… {elapsed}s
+              </Typography>
+              <MarkdownView content={markdown || '_El modelo está redactando…_' } />
+            </Box>
+          ) : (
+            <Box sx={{ mb: 3 }}>
+              <ToggleButtonGroup value={mode} exclusive onChange={(e, v) => v && setMode(v)} size="small" sx={{ mb: 1.5 }}>
+                <ToggleButton value="edit">Editar</ToggleButton>
+                <ToggleButton value="preview">Vista previa</ToggleButton>
+              </ToggleButtonGroup>
 
-            {mode === 'edit' ? (
-              <Box className="paper" sx={{ p: 1.5 }}>
-                <textarea
-                  value={markdown}
-                  onChange={(e) => setMarkdown(e.target.value)}
-                  rows={14}
-                  placeholder="Contenido en Markdown…"
-                  style={{
-                    width: '100%',
-                    border: 'none',
-                    outline: 'none',
-                    resize: 'vertical',
-                    background: 'transparent',
-                    fontFamily: 'JetBrains Mono, monospace',
-                    fontSize: 13,
-                    lineHeight: 1.6,
-                    color: '#23262b'
-                  }}
-                />
-              </Box>
-            ) : (
-              <MarkdownView content={markdown} />
-            )}
-          </Box>
+              {mode === 'edit' ? (
+                <Box className="paper" sx={{ p: 1.5 }}>
+                  <textarea
+                    value={markdown}
+                    onChange={(e) => setMarkdown(e.target.value)}
+                    rows={14}
+                    placeholder="Contenido en Markdown…"
+                    style={{
+                      width: '100%',
+                      border: 'none',
+                      outline: 'none',
+                      resize: 'vertical',
+                      background: 'transparent',
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: 13,
+                      lineHeight: 1.6,
+                      color: '#23262b'
+                    }}
+                  />
+                </Box>
+              ) : (
+                <MarkdownView content={markdown} />
+              )}
+            </Box>
+          )}
 
           {/* Diagrama */}
-          {stage.tipo === 'plantuml' && (
+          {stage.tipo === 'plantuml' && !loading && (
             <Box>
               <Typography className="eyebrow" sx={{ mb: 1 }}>
                 Diagrama UML · PlantUML
@@ -379,11 +461,31 @@ export default function Wizard() {
             </Box>
           )}
 
-          <Button size="small" sx={{ mt: 3 }} onClick={() => download(`${stage.id}.md`, markdown, 'text/markdown')}>
-            Exportar Markdown
-          </Button>
+          {!loading && (
+            <Button size="small" sx={{ mt: 3 }} onClick={() => download(`${stage.id}.md`, markdown, 'text/markdown')}>
+              Exportar Markdown
+            </Button>
+          )}
         </CardContent>
       </Card>
+
+      {/* Informe de coherencia */}
+      {(validating || report) && (
+        <Card className="rise" elevation={0} sx={{ background: '#141b24', mt: 3 }}>
+          <CardContent sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+              <FactCheckIcon sx={{ color: '#6c93e8' }} />
+              <Typography className="serif-display" sx={{ fontSize: 22, color: '#eae6dc' }}>
+                Informe de coherencia
+              </Typography>
+              {validating && (
+                <Chip icon={<CircularProgress size={14} color="inherit" />} label="Analizando…" size="small" variant="outlined" sx={{ color: '#93a0b0' }} />
+              )}
+            </Box>
+            <MarkdownView content={report || '_Analizando los modelos…_'} height={520} />
+          </CardContent>
+        </Card>
+      )}
 
       <Snackbar
         open={!!snack}
