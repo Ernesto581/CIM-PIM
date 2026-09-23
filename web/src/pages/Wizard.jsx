@@ -22,6 +22,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SaveIcon from '@mui/icons-material/Save';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PlantUMLViewer from '../components/PlantUMLViewer';
@@ -75,7 +76,7 @@ async function readStream(res, setText) {
     const { done, value } = await reader.read();
     if (done) break;
     full += decoder.decode(value, { stream: true });
-    setText(full);
+    if (setText) setText(full);
   }
   return full;
 }
@@ -84,6 +85,7 @@ export default function Wizard() {
   const { id } = useParams();
   const navigate = useNavigate();
   const stages = METHOD.stages;
+  const modelStages = stages.filter((s) => s.id !== 'requisitos');
 
   const [proyecto, setProyecto] = useState(null);
   const [activeStep, setActiveStep] = useState(0);
@@ -97,6 +99,8 @@ export default function Wizard() {
   const [snack, setSnack] = useState('');
   const [validating, setValidating] = useState(false);
   const [report, setReport] = useState('');
+  const [fixing, setFixing] = useState(false);
+  const [fixingStage, setFixingStage] = useState('');
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -127,19 +131,28 @@ export default function Wizard() {
 
   const stage = stages[activeStep];
 
-  const requisitosInput = () => {
-    if (!stage) return '';
-    if (stage.id === 'requisitos') return proyecto?.descripcion || '';
+  const getRequisitos = () => {
     const req = findEtapa(proyecto?.etapas, 'requisitos');
     return req?.contenido || proyecto?.descripcion || '';
   };
 
-  const persist = async (contenido, umlCode, nuevaDescripcion) => {
-    const etapa = { id: stage.id, nombre: stage.nombre, nivel: stage.nivel, contenido, uml: umlCode };
-    const update = { etapas: upsertEtapa(proyecto.etapas, etapa) };
+  const requisitosInput = () => {
+    if (!stage) return '';
+    if (stage.id === 'requisitos') return proyecto?.descripcion || '';
+    return getRequisitos();
+  };
+
+  const saveEtapa = async (baseProyecto, s, contenido, umlCode, nuevaDescripcion) => {
+    const etapa = { id: s.id, nombre: s.nombre, nivel: s.nivel, contenido, uml: umlCode };
+    const update = { etapas: upsertEtapa(baseProyecto.etapas, etapa) };
     if (nuevaDescripcion !== undefined) update.descripcion = nuevaDescripcion;
     const { data, error } = await supabase.from('projects').update(update).eq('id', id).select().single();
     if (error) throw error;
+    return data;
+  };
+
+  const persist = async (contenido, umlCode, nuevaDescripcion) => {
+    const data = await saveEtapa(proyecto, stage, contenido, umlCode, nuevaDescripcion);
     setProyecto(data);
     return data;
   };
@@ -224,7 +237,7 @@ export default function Wizard() {
       const res = await fetch('/api/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requisitos: requisitosInput(), modelos }),
+        body: JSON.stringify({ requisitos: getRequisitos(), modelos }),
         signal: controller.signal
       });
       if (!res.ok || !res.body) {
@@ -243,6 +256,57 @@ export default function Wizard() {
     } finally {
       clearTimeout(timeout);
       setValidating(false);
+    }
+  };
+
+  const fixModels = async () => {
+    setFixing(true);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 300000);
+
+    try {
+      let current = proyecto;
+      for (const s of modelStages) {
+        setFixingStage(s.nombre);
+        const etapaActual = findEtapa(current?.etapas, s.id);
+        const res = await fetch('/api/fix', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requisitos: getRequisitos(),
+            etapa: s.id,
+            informe: report,
+            actual: etapaActual?.contenido || ''
+          }),
+          signal: controller.signal
+        });
+        if (!res.ok || !res.body) {
+          let msg = 'Error al corregir';
+          try {
+            const j = await res.json();
+            msg = j.error || msg;
+          } catch {
+            /* ignore */
+          }
+          throw new Error(msg);
+        }
+        const content = await readStream(res);
+        const umlCode = extractUml(content);
+        current = await saveEtapa(current, s, content, umlCode);
+        setProyecto(current);
+
+        if (s.id === stages[activeStep]?.id) {
+          setMarkdown(content);
+          setUml(umlCode);
+        }
+      }
+      setSnack('Modelos corregidos según el informe de coherencia');
+    } catch (e) {
+      setSnack(e.name === 'AbortError' ? 'La corrección tardó demasiado.' : e.message || 'Error al corregir');
+    } finally {
+      clearTimeout(timeout);
+      setFixing(false);
+      setFixingStage('');
     }
   };
 
@@ -275,7 +339,7 @@ export default function Wizard() {
           variant="outlined"
           startIcon={validating ? <CircularProgress size={16} color="inherit" /> : <FactCheckIcon />}
           onClick={validate}
-          disabled={validating || loading}
+          disabled={validating || loading || fixing}
           sx={{ mb: 1 }}
         >
           {validating ? 'Validando…' : 'Validar coherencia'}
@@ -473,7 +537,7 @@ export default function Wizard() {
       {(validating || report) && (
         <Card className="rise" elevation={0} sx={{ background: '#141b24', mt: 3 }}>
           <CardContent sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
               <FactCheckIcon sx={{ color: '#6c93e8' }} />
               <Typography className="serif-display" sx={{ fontSize: 22, color: '#eae6dc' }}>
                 Informe de coherencia
@@ -481,7 +545,25 @@ export default function Wizard() {
               {validating && (
                 <Chip icon={<CircularProgress size={14} color="inherit" />} label="Analizando…" size="small" variant="outlined" sx={{ color: '#93a0b0' }} />
               )}
+              {!validating && report && (
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  size="small"
+                  startIcon={fixing ? <CircularProgress size={14} color="inherit" /> : <AutoFixHighIcon />}
+                  onClick={fixModels}
+                  disabled={fixing}
+                  sx={{ ml: 'auto' }}
+                >
+                  {fixing ? `Corrigiendo ${fixingStage}…` : 'Corregir modelos'}
+                </Button>
+              )}
             </Box>
+            {fixing && (
+              <Typography variant="caption" color="text.secondary">
+                Corrigiendo cada modelo según el informe…
+              </Typography>
+            )}
             <MarkdownView content={report || '_Analizando los modelos…_'} height={520} />
           </CardContent>
         </Card>
