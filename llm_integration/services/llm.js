@@ -1,4 +1,5 @@
 const OpenAI = require('openai');
+const { randomUUID } = require('crypto');
 const logger = require('../utils/logger');
 
 const BASE_URL = process.env.LLM_BASE_URL || 'https://opencode.ai/zen/go/v1';
@@ -20,15 +21,23 @@ function getClient() {
 
 async function generate({ system, user, temperature = 0.1 }) {
   const openai = getClient();
-  const response = await openai.chat.completions.create({
-    model: MODEL,
-    reasoning_effort: REASONING_EFFORT,
-    temperature,
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user }
-    ]
-  });
+  const response = await openai.chat.completions.create(
+    {
+      model: MODEL,
+      reasoning_effort: REASONING_EFFORT,
+      temperature,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ]
+    },
+    {
+      headers: {
+        'User-Agent': 'jmda-cim-pim/4.0',
+        'x-opencode-session': randomUUID()
+      }
+    }
+  );
 
   const content = response.choices?.[0]?.message?.content;
   if (!content) {

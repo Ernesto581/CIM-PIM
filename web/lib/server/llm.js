@@ -1,4 +1,5 @@
 // Utilidades compartidas por las funciones serverless de Vercel.
+import { randomUUID } from 'node:crypto';
 
 export function extractUml(markdown) {
   const codeBlock =
@@ -42,7 +43,9 @@ export async function streamChatCompletion(res, { system, user }) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
+        Authorization: `Bearer ${apiKey}`,
+        'User-Agent': 'jmda-cim-pim/4.0',
+        'x-opencode-session': randomUUID()
       },
       body: JSON.stringify({
         model,
