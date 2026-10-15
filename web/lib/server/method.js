@@ -13,7 +13,7 @@ export const method = {
       system:
         'Eres un analista de sistemas experto en levantamiento de requisitos para Sistemas de Información. Tu función es transformar una idea descrita en lenguaje natural por un cliente en un documento de requisitos claro, completo y bien estructurado, sin asumir detalles técnicos de implementación (plataforma, base de datos, framework).',
       format:
-        'Responde ÚNICAMENTE en formato Markdown válido, sin texto fuera del markdown. Estructura la respuesta con los siguientes encabezados exactos:\n\n## Descripción General\n\n## Alcance del Sistema\n\n## Actores\n\n## Requisitos Funcionales\n\n## Requisitos No Funcionales\n\n## Supuestos y Restricciones\n\nCada requisito funcional y no funcional debe ser una lista numerada con una frase clara y verificable. No incluyas código ni diagramas.',
+        'Responde ÚNICAMENTE en formato Markdown válido, sin texto fuera del markdown. Estructura la respuesta con los siguientes encabezados exactos:\n\n## Descripción General\n\n## Alcance del Sistema\n\n## Actores\n\n## Requisitos Funcionales\n\n## Requisitos No Funcionales\n\n## Supuestos y Restricciones\n\nEn "Actores" enumera cada actor con un identificador en el formato "- A1: nombre — descripción corta". En "Requisitos Funcionales" enumera cada requisito con un identificador único y estable en el formato "- RF1: frase clara y verificable" (RF2, RF3, …). En "Requisitos No Funcionales" usa "- RNF1: frase clara y verificable". No incluyas código ni diagramas.',
       prompt:
         'A partir de la siguiente descripción en lenguaje natural, elabora el documento de requisitos del Sistema de Información. Si la descripción es ambigua o incompleta, infiere los elementos más razonables para un sistema de ese tipo y anótalos como supuestos.\n\nDescripción:\n{requisitos}'
     },
@@ -25,7 +25,7 @@ export const method = {
       system:
         'Eres un analista de sistemas experto en UML. Identifica actores y casos de uso a partir de los requisitos, define sus relaciones y genera un diagrama de casos de uso correcto.',
       format:
-        'Responde en Markdown con las secciones:\n\n## Actores y Casos de Uso\n- Lista de actores (nombre y descripción corta).\n- Lista numerada de casos de uso (nombre y resumen de una línea).\n\n## Relaciones\n- Lista de relaciones entre actores y casos de uso (incluir include/extend/generalización cuando aplique).\n\n## Diagrama PlantUML\nIncluye un único bloque de código marcado con ```plantuml que contenga el diagrama de casos de uso entre @startuml y @enduml.',
+        'Responde en Markdown con las secciones:\n\n## Actores\n- Lista de actores con identificador y descripción corta, en el formato "- A1: nombre — descripción".\n\n## Casos de Uso\nPara cada caso de uso usa exactamente este formato:\n### CU1: Nombre del caso de uso\n- Actores: A1, A2\n- Cubre: RF1, RF3\n- Resumen: una línea\n\n## Relaciones\n- Lista de relaciones entre actores y casos de uso (incluir include/extend/generalización cuando aplique).\n\n## Diagrama PlantUML\nIncluye un único bloque de código marcado con ```plantuml que contenga el diagrama de casos de uso entre @startuml y @enduml.',
       prompt:
         'A partir de los siguientes requisitos, identifica los actores y casos de uso del sistema y genera el diagrama de casos de uso.\n\nRequisitos:\n{requisitos}'
     },
@@ -37,7 +37,7 @@ export const method = {
       system:
         'Eres un analista de sistemas experto en UML y modelado orientado a objetos. Identifica las clases de dominio, sus atributos, métodos y relaciones, generando un diagrama de clases independiente de la plataforma.',
       format:
-        'Responde en Markdown con las secciones:\n\n## Clases\nPara cada clase indica: nombre, atributos (nombre: tipo) y operaciones.\n\n## Relaciones\nLista de relaciones con su tipo (asociación, agregación, composición, herencia) y multiplicidad cuando sea posible.\n\n## Diagrama PlantUML\nIncluye un único bloque de código marcado con ```plantuml que contenga el diagrama de clases entre @startuml y @enduml.',
+        'Responde en Markdown con las secciones:\n\n## Clases\nPara cada clase usa este formato:\n### NombreClase\n- Atributos: nombre: tipo, …\n- Operaciones: metodo(), …\n- Realiza: CU1, CU2\n\n## Relaciones\nLista de relaciones con su tipo (asociación, agregación, composición, herencia) y multiplicidad cuando sea posible.\n\n## Diagrama PlantUML\nIncluye un único bloque de código marcado con ```plantuml que contenga el diagrama de clases entre @startuml y @enduml.',
       prompt:
         'A partir de los siguientes requisitos y casos de uso, elabora el diagrama de clases del sistema.\n\nRequisitos:\n{requisitos}'
     },

@@ -130,6 +130,44 @@ function appearsInRelation(uml, cu) {
   return false;
 }
 
+// --- Trazabilidad RF <-> casos de uso ---
+
+// Identificadores de requisitos funcionales (RF1, RF2, ...) declarados.
+function extractRFIds(content) {
+  const ids = new Set();
+  const re = /\bRF\d+\b/g;
+  let m;
+  while ((m = re.exec(String(content || ''))) !== null) ids.add(m[0]);
+  return ids;
+}
+
+// Casos de uso (CU1, CU2, ...) con los requisitos que declaran cubrir.
+function extractCoberturaCU(content) {
+  const cus = [];
+  let actual = null;
+  for (const line of String(content || '').split('\n')) {
+    if (/^\s*##\s+/.test(line) && !/^\s*###/.test(line)) {
+      actual = null;
+      continue;
+    }
+    const h = line.match(/^\s*###\s*(CU\d+)\b/i);
+    if (h) {
+      actual = { id: h[1].toUpperCase(), cubre: new Set() };
+      cus.push(actual);
+      continue;
+    }
+    if (actual) {
+      const cov = line.match(/^\s*[-*]?\s*Cubre\s*:\s*(.+)$/i);
+      if (cov) {
+        const re = /\bRF\d+\b/g;
+        let r;
+        while ((r = re.exec(cov[1])) !== null) actual.cubre.add(r[0]);
+      }
+    }
+  }
+  return cus;
+}
+
 // --- Reglas de verificación ---
 
 const ETAPAS_PLANTUML = {
@@ -197,6 +235,32 @@ export function verificarCoherencia(modelos) {
   for (const cu of extractUseCases(casos?.uml)) {
     if (!appearsInRelation(casos?.uml, cu)) {
       add('advertencia', 'media', `El caso de uso "${cu.name}" no está conectado a ningún actor en el diagrama de casos de uso.`);
+    }
+  }
+
+  // R6/R7. Trazabilidad entre requisitos funcionales y casos de uso
+  const rfDeclarados = extractRFIds(req?.contenido);
+  const cusCobertura = extractCoberturaCU(casos?.contenido);
+  if (rfDeclarados.size > 0 && cusCobertura.length === 0) {
+    add('advertencia', 'media', 'No se identificaron casos de uso con identificador (CU1, CU2, …) para verificar la trazabilidad con los requisitos.');
+  }
+  if (rfDeclarados.size > 0 && cusCobertura.length > 0) {
+    const rfCubiertos = new Set();
+    for (const cu of cusCobertura) for (const rf of cu.cubre) rfCubiertos.add(rf);
+
+    // R6. Todo requisito funcional debe estar cubierto por al menos un caso de uso
+    for (const rf of rfDeclarados) {
+      if (!rfCubiertos.has(rf)) {
+        add('omision', 'alta', `El requisito ${rf} no está cubierto por ningún caso de uso (falta de trazabilidad).`);
+      }
+    }
+    // R7. Todo requisito referenciado por un caso de uso debe existir
+    for (const cu of cusCobertura) {
+      for (const rf of cu.cubre) {
+        if (!rfDeclarados.has(rf)) {
+          add('inconsistencia', 'media', `El caso de uso ${cu.id} referencia el requisito ${rf}, que no está declarado en los requisitos.`);
+        }
+      }
     }
   }
 
