@@ -1,45 +1,40 @@
-// Verificación de la sesión de Supabase (JWT HS256) en las funciones serverless.
-// Valida la firma del token con el secreto del proyecto y devuelve el id del
-// usuario autenticado (sub), o null si el token es inválido, está expirado o
-// no corresponde a un usuario autenticado.
+// Validación de la sesión de Supabase en las funciones serverless.
 //
-// Requiere la variable de entorno SUPABASE_JWT_SECRET (Project Settings -> API
-// -> JWT Settings -> JWT Secret en el dashboard de Supabase).
+// Se valida el token contra el servicio de autenticación de Supabase
+// (auth.getUser). De este modo funciona con cualquier algoritmo de firma
+// (HS256 heredado o claves asimétricas ES256/RS256) sin depender del secreto
+// JWT. Reutiliza la URL y la clave pública ya configuradas para el cliente
+// (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY), o SUPABASE_URL / SUPABASE_ANON_KEY
+// si se definen aparte.
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createClient } from '@supabase/supabase-js';
 
-function base64UrlDecode(str) {
-  const b64 = str.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = b64.length % 4;
-  const padded = pad ? b64 + '='.repeat(4 - pad) : b64;
-  return Buffer.from(padded, 'base64');
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+
+let client = null;
+function getClient() {
+  if (!client && SUPABASE_URL && SUPABASE_ANON_KEY) {
+    client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+  }
+  return client;
 }
 
-export function getUserId(req) {
-  const secret = process.env.SUPABASE_JWT_SECRET || '';
+// Devuelve el id del usuario autenticado, o null si el token falta o no es válido.
+export async function getUserId(req) {
   const header = req.headers['authorization'] || '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  if (!token || !secret) return null;
+  if (!token) return null;
 
-  const parts = token.split('.');
-  if (parts.length !== 3) return null;
-  const [h, p, s] = parts;
+  const supabase = getClient();
+  if (!supabase) return null;
 
   try {
-    const headerObj = JSON.parse(base64UrlDecode(h).toString('utf8'));
-    if (headerObj.alg !== 'HS256') return null;
-
-    const signingInput = `${h}.${p}`;
-    const expected = createHmac('sha256', secret).update(signingInput).digest();
-    const provided = base64UrlDecode(s);
-    if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
-      return null;
-    }
-
-    const payload = JSON.parse(base64UrlDecode(p).toString('utf8'));
-    if (payload.exp && Math.floor(Date.now() / 1000) >= payload.exp) return null;
-    if (payload.role !== 'authenticated') return null;
-    return payload.sub || null;
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data?.user) return null;
+    return data.user.id;
   } catch {
     return null;
   }

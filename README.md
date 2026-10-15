@@ -69,7 +69,7 @@ La aplicación se encuentra desplegada y en funcionamiento en:
    - `LLM_BASE_URL` = `https://opencode.ai/inference/v1` (OpenCode Console; para la suscripción Go usa `https://opencode.ai/inference/go/v1`)
    - `LLM_MODEL` = `deepseek-v4-pro`
    - `LLM_REASONING_EFFORT` = `none` (importante: evita el timeout de ~60s)
-   - `SUPABASE_JWT_SECRET` = tu JWT secret (Supabase → Project Settings → API → JWT Settings). Lo usan las funciones `/api/*` para validar la sesión.
+   - (Las funciones `/api/*` validan la sesión del usuario con `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`, ya configuradas arriba; no hace falta un secreto adicional.)
    - `RATE_LIMIT_MAX` = `20` (opcional; solicitudes por usuario por ventana)
    - `RATE_LIMIT_WINDOW_MS` = `60000` (opcional; ventana en ms)
 4. Deploy.

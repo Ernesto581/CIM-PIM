@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const userId = getUserId(req);
+  const userId = await getUserId(req);
   if (!userId) {
     res.status(401).json({ error: 'No autenticado' });
     return;
