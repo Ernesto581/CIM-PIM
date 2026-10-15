@@ -32,6 +32,12 @@ import MarkdownView from '../components/MarkdownView';
 import { supabase } from '../lib/supabase';
 import { METHOD } from '../lib/method';
 
+async function authHeaders() {
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 const NIVEL = {
   CIM: { label: 'CIM', color: '#e0a45c' },
   PIM: { label: 'PIM', color: '#7fb78a' },
@@ -234,7 +240,7 @@ export default function Wizard() {
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ requisitos: requisitosInput(), etapa: stage.id }),
         signal: controller.signal
       });
@@ -270,7 +276,7 @@ export default function Wizard() {
     setReport('');
     const modelos = stages.map((s) => {
       const e = findEtapa(proyecto?.etapas, s.id);
-      return { nombre: s.nombre, contenido: e?.contenido || '', uml: e?.uml || '' };
+      return { id: s.id, nombre: s.nombre, contenido: e?.contenido || '', uml: e?.uml || '' };
     });
 
     const controller = new AbortController();
@@ -278,7 +284,7 @@ export default function Wizard() {
     try {
       const res = await fetch('/api/validate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ requisitos: getRequisitos(), modelos }),
         signal: controller.signal
       });
@@ -315,7 +321,7 @@ export default function Wizard() {
         const before = etapaActual?.contenido || '';
         const res = await fetch('/api/fix', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
           body: JSON.stringify({
             requisitos: getRequisitos(),
             etapa: s.id,

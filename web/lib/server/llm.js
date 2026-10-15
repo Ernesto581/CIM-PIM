@@ -26,7 +26,9 @@ function env(name, fallback) {
 }
 
 // Llama al LLM con streaming y va escribiendo el texto en `res`.
-export async function streamChatCompletion(res, { system, user }) {
+// `before` (opcional) se escribe antes de comenzar el streaming (p. ej. el
+// informe de la verificación determinista en /api/validate).
+export async function streamChatCompletion(res, { system, user, before }) {
   const baseUrl = env('LLM_BASE_URL', 'https://opencode.ai/zen/go/v1').replace(/\/$/, '');
   const apiKey = env('LLM_API_KEY', '');
   const model = env('LLM_MODEL', 'deepseek-v4-pro');
@@ -74,6 +76,8 @@ export async function streamChatCompletion(res, { system, user }) {
     'Cache-Control': 'no-cache, no-transform',
     'X-Accel-Buffering': 'no'
   });
+
+  if (before) res.write(before);
 
   const reader = upstream.body.getReader();
   const decoder = new TextDecoder();

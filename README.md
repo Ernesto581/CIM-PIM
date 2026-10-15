@@ -1,6 +1,12 @@
 # jMDA · Módulo CIM-PIM (v4)
 
-Herramienta CASE para **Arquitectura Dirigida por Modelos (MDA)**. Genera el **Modelo Independiente de la Plataforma (PIM)** a partir de una idea de sistema de información descrita en **lenguaje natural (CIM)**, usando **IA generativa** y una **metódica de conversión CIM→PIM**.
+Herramienta CASE para **Arquitectura Dirigida por Modelos (MDA)**. Genera el **Modelo Independiente de la Plataforma (PIM)** a partir de una idea de sistema de información descrita en **lenguaje natural (CIM)**, usando **Inteligencia Artificial generativa** (DeepSeek, a través de la plataforma OpenCode) y una **metódica de conversión CIM→PIM**.
+
+## Despliegue actual
+
+La aplicación se encuentra desplegada y en funcionamiento en:
+
+- **Producción:** https://web-beta-teal-66.vercel.app/ — frontend en **Vercel**, backend (base de datos y autenticación) en **Supabase**.
 
 ## Metódica CIM→PIM
 
@@ -12,14 +18,32 @@ Herramienta CASE para **Arquitectura Dirigida por Modelos (MDA)**. Genera el **M
 | Modelo de Secuencia | PIM | CU/Clases | Interacciones + PlantUML |
 | Modelo de Actividades | PIM | CU | Flujos + PlantUML |
 
-La metódica (prompts) vive en:
-- `web/api/method.js` → función serverless de Vercel (usada en producción).
-- `supabase/functions/generate/method.ts` → alternativa con Edge Function de Supabase.
-- `llm_integration/prompts/method.json` → versión Docker (fuente de referencia).
+## Funcionalidades
 
-## Estructura
+- Registro e inicio de sesión de usuarios (Supabase Auth).
+- Gestión de proyectos (crear, listar, abrir, editar y eliminar).
+- Introducción de la idea del sistema en lenguaje natural.
+- Generación de los artefactos del PIM con IA, en tiempo real (streaming).
+- Visualización de los diagramas UML mediante PlantUML.
+- Edición y guardado del contenido (Markdown) y del código PlantUML de cada modelo.
+- Validación automática de la coherencia entre los requisitos y los modelos.
+- Corrección automática de los modelos según el informe, con visualización de los cambios (diff).
+- Exportación de los artefactos en formatos `.puml`, PNG y Markdown.
 
-- **`web/`** → App React (Vercel) + función serverless `/api/generate` (llama a la IA).
+## Arquitectura y tecnologías
+
+| Capa | Tecnología |
+|---|---|
+| Frontend | React (Vite) + Material UI |
+| Backend | Funciones serverless de Node.js en Vercel (`/api/generate`, `/api/validate`, `/api/fix`) |
+| Base de datos y autenticación | Supabase (PostgreSQL + Auth + Row Level Security) |
+| Inteligencia artificial | DeepSeek (`deepseek-v4-pro`) a través de OpenCode Go |
+| Diagramas | PlantUML |
+| Alternativa local/offline | Docker (microservicios + servidor PlantUML local) |
+
+## Estructura del repositorio
+
+- **`web/`** → Aplicación React (despliegue en Vercel) + funciones serverless `/api/generate`, `/api/validate` y `/api/fix`.
 - **`supabase/`** → Esquema SQL (`migrations/`) y Edge Function opcional (`functions/generate`).
 - Raíz (Docker) → `client_app/`, `manager_service/`, `llm_integration/`, `api_gateway/`, `docker-compose.yml` → alternativa local/offline.
 
@@ -31,10 +55,10 @@ La metódica (prompts) vive en:
 1. Crea un proyecto en [supabase.com](https://supabase.com).
 2. Ejecuta el esquema: **SQL Editor** → pega `supabase/migrations/0001_schema.sql` → *Run* (crea `profiles`, `projects`, RLS y el trigger de perfil).
 3. **Authentication → Providers → Email**: habilítalo.
-4. Para probar sin correo: **Authentication → Settings** → desactiva **Confirm email** (o crea usuarios desde *Authentication → Users → Add user* marcando *Auto Confirm User*).
+4. Para probar sin correo: **Authentication → Settings** → desactiva **Confirm email**.
 5. Copia **Project URL** y **Publishable key** desde **Project Settings → API**.
 
-### 2. Vercel (frontend + función de IA)
+### 2. Vercel (frontend + funciones de IA)
 1. Importa este repo en [vercel.com](https://vercel.com).
 2. **Root Directory** = `web`.
 3. Variables de entorno (Project → Settings → Environment Variables):
@@ -45,18 +69,21 @@ La metódica (prompts) vive en:
    - `LLM_BASE_URL` = `https://opencode.ai/zen/go/v1`
    - `LLM_MODEL` = `deepseek-v4-pro`
    - `LLM_REASONING_EFFORT` = `none` (importante: evita el timeout de ~60s)
+   - `SUPABASE_JWT_SECRET` = tu JWT secret (Supabase → Project Settings → API → JWT Settings). Lo usan las funciones `/api/*` para validar la sesión.
+   - `RATE_LIMIT_MAX` = `20` (opcional; solicitudes por usuario por ventana)
+   - `RATE_LIMIT_WINDOW_MS` = `60000` (opcional; ventana en ms)
 4. Deploy.
 
-> La función `/api/generate` se despliega automáticamente con Vercel y mantiene la clave de IA en secreto.
+> Las funciones `/api/generate`, `/api/validate` y `/api/fix` se despliegan automáticamente con Vercel y mantienen la clave de IA en secreto (no llega al navegador).
 
 ### Alternativa: Edge Function de Supabase
-Si prefieres la IA dentro de Supabase:
+Si se prefiere la IA dentro de Supabase:
 ```bash
 npm i -g supabase
 supabase login
 supabase link --project-ref <tu_ref>
 supabase functions deploy generate --no-verify-jwt
-supabase secrets set LLM_BASE_URL=... LLM_MODEL=... LLM_API_KEY=...
+supabase secrets set LLM_BASE_URL=... LLM_MODEL=... LLM_API_KEY=... LLM_REASONING_EFFORT=none
 ```
 (en ese caso cambia `web/src/pages/Wizard.jsx` para usar `supabase.functions.invoke('generate', ...)`).
 
@@ -77,5 +104,7 @@ docker compose up --build
 ---
 
 ## Notas
-- Los secretos nunca se suben al repo (`.env` está en `.gitignore`).
+
+- Los secretos nunca se suben al repositorio (`.env` está en `.gitignore`; se entregan los `.env.example` con valores `CHANGEME`).
 - En Vercel los diagramas usan el PlantUML público (requiere internet); en Docker se usa un servidor PlantUML local.
+- El proveedor de IA empleado (OpenCode Go, basado en DeepSeek) es accesible desde Cuba sin necesidad de VPN.
