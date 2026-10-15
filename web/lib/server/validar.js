@@ -186,7 +186,7 @@ export function verificarCoherencia(modelos) {
   const hallazgos = [];
   const add = (tipo, nivel, mensaje) => hallazgos.push({ tipo, nivel, mensaje });
 
-  // R1. Etapas incompletas (omisiones)
+  // RV1. Etapas incompletas (omisiones)
   const req = byId['requisitos'];
   if (!req || !(req.contenido || '').trim()) {
     add('omision', 'alta', 'No se ha generado el documento de requisitos (Modelo de Requisitos en Texto).');
@@ -208,14 +208,14 @@ export function verificarCoherencia(modelos) {
   const actoresCU = extractActors(casos?.uml);
   const seqInfo = extractSequence(secuencia?.uml);
 
-  // R2. Actores declarados en casos de uso ausentes del diagrama de secuencia
+  // RV2. Actores declarados en casos de uso ausentes del diagrama de secuencia
   for (const a of actoresCU) {
     if (!seqInfo.participants.has(norm(a))) {
       add('advertencia', 'media', `El actor "${a}" (declarado en el diagrama de casos de uso) no aparece en el diagrama de secuencia.`);
     }
   }
 
-  // R3. Actores de secuencia no declarados en el diagrama de casos de uso
+  // RV3. Actores de secuencia no declarados en el diagrama de casos de uso
   const actoresSec = extractSequenceActors(secuencia?.uml);
   const setActoresCU = new Set(actoresCU.map(norm));
   for (const a of actoresSec) {
@@ -224,21 +224,21 @@ export function verificarCoherencia(modelos) {
     }
   }
 
-  // R4. Clases del diagrama de clases que no participan en el de secuencia
+  // RV4. Clases del diagrama de clases que no participan en el de secuencia
   for (const c of extractClasses(clases?.uml)) {
     if (!seqInfo.participants.has(norm(c))) {
       add('advertencia', 'media', `La clase "${c}" (del diagrama de clases) no participa en el diagrama de secuencia.`);
     }
   }
 
-  // R5. Casos de uso sin relación con ningún actor
+  // RV5. Casos de uso sin relación con ningún actor
   for (const cu of extractUseCases(casos?.uml)) {
     if (!appearsInRelation(casos?.uml, cu)) {
       add('advertencia', 'media', `El caso de uso "${cu.name}" no está conectado a ningún actor en el diagrama de casos de uso.`);
     }
   }
 
-  // R6/R7. Trazabilidad entre requisitos funcionales y casos de uso
+  // RV6/RV7. Trazabilidad entre requisitos funcionales y casos de uso
   const rfDeclarados = extractRFIds(req?.contenido);
   const cusCobertura = extractCoberturaCU(casos?.contenido);
   if (rfDeclarados.size > 0 && cusCobertura.length === 0) {
@@ -248,13 +248,13 @@ export function verificarCoherencia(modelos) {
     const rfCubiertos = new Set();
     for (const cu of cusCobertura) for (const rf of cu.cubre) rfCubiertos.add(rf);
 
-    // R6. Todo requisito funcional debe estar cubierto por al menos un caso de uso
+    // RV6. Todo requisito funcional debe estar cubierto por al menos un caso de uso
     for (const rf of rfDeclarados) {
       if (!rfCubiertos.has(rf)) {
         add('omision', 'alta', `El requisito ${rf} no está cubierto por ningún caso de uso (falta de trazabilidad).`);
       }
     }
-    // R7. Todo requisito referenciado por un caso de uso debe existir
+    // RV7. Todo requisito referenciado por un caso de uso debe existir
     for (const cu of cusCobertura) {
       for (const rf of cu.cubre) {
         if (!rfDeclarados.has(rf)) {
