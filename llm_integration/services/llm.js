@@ -2,7 +2,7 @@ const OpenAI = require('openai');
 const { randomUUID } = require('crypto');
 const logger = require('../utils/logger');
 
-const BASE_URL = process.env.LLM_BASE_URL || 'https://opencode.ai/zen/go/v1';
+const BASE_URL = process.env.LLM_BASE_URL || 'https://opencode.ai/inference/v1';
 const API_KEY = process.env.LLM_API_KEY;
 const MODEL = process.env.LLM_MODEL || 'deepseek-v4-pro';
 const REASONING_EFFORT = process.env.LLM_REASONING_EFFORT || 'none';

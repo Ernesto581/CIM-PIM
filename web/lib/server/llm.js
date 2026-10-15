@@ -29,7 +29,7 @@ function env(name, fallback) {
 // `before` (opcional) se escribe antes de comenzar el streaming (p. ej. el
 // informe de la verificación determinista en /api/validate).
 export async function streamChatCompletion(res, { system, user, before }) {
-  const baseUrl = env('LLM_BASE_URL', 'https://opencode.ai/zen/go/v1').replace(/\/$/, '');
+  const baseUrl = env('LLM_BASE_URL', 'https://opencode.ai/inference/v1').replace(/\/$/, '');
   const apiKey = env('LLM_API_KEY', '');
   const model = env('LLM_MODEL', 'deepseek-v4-pro');
   const reasoningEffort = env('LLM_REASONING_EFFORT', 'none');

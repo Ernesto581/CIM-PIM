@@ -65,8 +65,8 @@ La aplicación se encuentra desplegada y en funcionamiento en:
    - `VITE_SUPABASE_URL` = `https://<ref>.supabase.co`
    - `VITE_SUPABASE_ANON_KEY` = tu publishable key (`sb_publishable_...`)
    - `VITE_PLANTUML_URL` = `https://www.plantuml.com/plantuml` (opcional)
-   - `LLM_API_KEY` = tu clave de IA (OpenCode Go: `sk-...`)
-   - `LLM_BASE_URL` = `https://opencode.ai/zen/go/v1`
+   - `LLM_API_KEY` = tu clave de IA (clave de API de OpenCode: `oc_sk_...` para el servicio Console, o la clave de Go)
+   - `LLM_BASE_URL` = `https://opencode.ai/inference/v1` (OpenCode Console; para la suscripción Go usa `https://opencode.ai/inference/go/v1`)
    - `LLM_MODEL` = `deepseek-v4-pro`
    - `LLM_REASONING_EFFORT` = `none` (importante: evita el timeout de ~60s)
    - `SUPABASE_JWT_SECRET` = tu JWT secret (Supabase → Project Settings → API → JWT Settings). Lo usan las funciones `/api/*` para validar la sesión.
