@@ -150,6 +150,8 @@ export default function Wizard() {
   const [fixing, setFixing] = useState(false);
   const [fixingStage, setFixingStage] = useState('');
   const [fixResults, setFixResults] = useState([]);
+  const [pendingFixes, setPendingFixes] = useState([]);
+  const [controller, setController] = useState(null);
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -233,19 +235,27 @@ export default function Wizard() {
       setSnack(built.error);
       return;
     }
+
+    if (markdown.trim() || uml.trim()) {
+      if (!window.confirm('Esta etapa ya tiene contenido. ¿Deseas sobrescribirla?')) {
+        return;
+      }
+    }
+
+    const newController = new AbortController();
+    setController(newController);
     setLoading(true);
     setElapsed(0);
     setMarkdown('');
     timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 180000);
+    const timeout = setTimeout(() => newController.abort(), 180000);
 
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ requisitos: built.text, etapa: stage.id }),
-        signal: controller.signal
+        signal: newController.signal
       });
 
       if (!res.ok || !res.body) {
@@ -265,13 +275,30 @@ export default function Wizard() {
       await persist(content, umlCode);
       setSnack(`${stage.nombre} generado con IA`);
     } catch (e) {
-      if (e.name === 'AbortError') setSnack('La generación tardó demasiado. Inténtalo de nuevo.');
+      if (e.name === 'AbortError') setSnack('Generación cancelada.');
       else setSnack(e.message || 'Error al generar con la IA');
     } finally {
       clearTimeout(timeout);
       if (timerRef.current) clearInterval(timerRef.current);
       setLoading(false);
+      setController(null);
     }
+  };
+
+  const cancelGenerate = () => {
+    if (controller) controller.abort();
+  };
+
+  const exportProject = () => {
+    const lines = [`# ${proyecto.nombre}`, '', proyecto.descripcion || '', ''];
+    for (const s of stages) {
+      const e = findEtapa(proyecto?.etapas, s.id);
+      if (e?.contenido) {
+        lines.push(`## ${s.nombre}`, '', e.contenido, '');
+        if (e.uml) lines.push('```plantuml', e.uml, '```', '');
+      }
+    }
+    download(`${proyecto.nombre}.md`, lines.join('\n'), 'text/markdown');
   };
 
   const validate = async () => {
@@ -313,11 +340,13 @@ export default function Wizard() {
   const fixModels = async () => {
     setFixing(true);
     setFixResults([]);
+    setPendingFixes([]);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 300000);
 
     try {
       let current = proyecto;
+      const fixes = [];
       for (const s of modelStages) {
         setFixingStage(s.nombre);
         const etapaActual = findEtapa(current?.etapas, s.id);
@@ -350,25 +379,18 @@ export default function Wizard() {
 
         const d = diffLines(before, content);
         const changes = d.filter((x) => x.type !== 'same');
-        setFixResults((prev) => [
-          ...prev,
-          {
-            nombre: s.nombre,
-            added: changes.filter((x) => x.type === 'add').length,
-            removed: changes.filter((x) => x.type === 'del').length,
-            lines: changes
-          }
-        ]);
-
-        current = await saveEtapa(current, s, content, umlCode);
-        setProyecto(current);
-
-        if (s.id === stages[activeStep]?.id) {
-          setMarkdown(content);
-          setUml(umlCode);
-        }
+        fixes.push({
+          stage: s,
+          before,
+          after: content,
+          uml: umlCode,
+          added: changes.filter((x) => x.type === 'add').length,
+          removed: changes.filter((x) => x.type === 'del').length,
+          lines: changes
+        });
       }
-      setSnack('Modelos corregidos según el informe de coherencia');
+      setPendingFixes(fixes);
+      setSnack('Correcciones generadas. Revisa y aplica o descarta cada una.');
     } catch (e) {
       setSnack(e.name === 'AbortError' ? 'La corrección tardó demasiado.' : e.message || 'Error al corregir');
     } finally {
@@ -376,6 +398,40 @@ export default function Wizard() {
       setFixing(false);
       setFixingStage('');
     }
+  };
+
+  const applyFix = async (index) => {
+    const fix = pendingFixes[index];
+    try {
+      const data = await saveEtapa(proyecto, fix.stage, fix.after, fix.uml);
+      setProyecto(data);
+      if (fix.stage.id === stage?.id) {
+        setMarkdown(fix.after);
+        setUml(fix.uml);
+      }
+      setPendingFixes((prev) => prev.filter((_, i) => i !== index));
+      setSnack(`${fix.stage.nombre} corregido.`);
+    } catch (e) {
+      setSnack(e.message || 'Error al guardar');
+    }
+  };
+
+  const discardFix = (index) => {
+    setPendingFixes((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const applyAllFixes = async () => {
+    let current = proyecto;
+    for (const fix of pendingFixes) {
+      current = await saveEtapa(current, fix.stage, fix.after, fix.uml);
+      if (fix.stage.id === stage?.id) {
+        setMarkdown(fix.after);
+        setUml(fix.uml);
+      }
+    }
+    setProyecto(current);
+    setPendingFixes([]);
+    setSnack('Todos los modelos corregidos.');
   };
 
   if (!proyecto) {
@@ -503,9 +559,19 @@ export default function Wizard() {
                 >
                   {loading ? `Generando… ${elapsed}s` : 'Generar con IA'}
                 </Button>
+                {loading && (
+                  <Button variant="outlined" color="error" onClick={cancelGenerate} sx={{ px: 2.5 }}>
+                    Cancelar
+                  </Button>
+                )}
                 <Button variant="outlined" startIcon={<SaveIcon />} onClick={saveStage} disabled={saving || loading}>
                   Guardar
                 </Button>
+                {!loading && (
+                  <Button variant="outlined" onClick={exportProject} sx={{ px: 2.5 }}>
+                    Exportar proyecto
+                  </Button>
+                )}
               </Stack>
 
               {loading ? (
@@ -660,12 +726,12 @@ export default function Wizard() {
               </Box>
             )}
 
-            {fixResults.map((r) => (
-              <Card key={r.nombre} elevation={0} sx={{ background: '#10161e', mb: 2, borderRadius: 2 }}>
+            {pendingFixes.map((r, idx) => (
+              <Card key={r.stage.id} elevation={0} sx={{ background: '#10161e', mb: 2, borderRadius: 2 }}>
                 <CardContent sx={{ p: 2.5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
                     <Typography className="serif-display" sx={{ fontSize: 18, color: '#eae6dc' }}>
-                      {r.nombre}
+                      {r.stage.nombre}
                     </Typography>
                     <Chip label={`+${r.added}`} size="small" sx={{ color: '#7fb78a', borderColor: '#7fb78a', border: '1px solid' }} />
                     <Chip label={`-${r.removed}`} size="small" sx={{ color: '#e07a6a', borderColor: '#e07a6a', border: '1px solid' }} />
@@ -703,9 +769,29 @@ export default function Wizard() {
                       )}
                     </Box>
                   )}
+
+                  <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+                    <Button size="small" variant="contained" onClick={() => applyFix(idx)}>
+                      Aplicar
+                    </Button>
+                    <Button size="small" variant="outlined" color="error" onClick={() => discardFix(idx)}>
+                      Descartar
+                    </Button>
+                  </Stack>
                 </CardContent>
               </Card>
             ))}
+
+            {pendingFixes.length > 0 && (
+              <Stack direction="row" spacing={1.5} sx={{ mt: 2 }}>
+                <Button variant="contained" onClick={applyAllFixes}>
+                  Aplicar todas
+                </Button>
+                <Button variant="outlined" color="error" onClick={() => setPendingFixes([])}>
+                  Descartar todas
+                </Button>
+              </Stack>
+            )}
           </CardContent>
         </Card>
       )}

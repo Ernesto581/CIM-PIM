@@ -132,6 +132,38 @@ function appearsInRelation(uml, cu) {
 
 // --- Trazabilidad RF <-> casos de uso ---
 
+// Identificadores de casos de uso (CU1, CU2, ...) declarados en el modelo de casos de uso.
+function extractCUIds(content) {
+  const ids = new Set();
+  const re = /\bCU\d+\b/g;
+  let m;
+  while ((m = re.exec(String(content || ''))) !== null) ids.add(m[0]);
+  return ids;
+}
+
+// Mapa clase -> Set de CU que declara en el campo "Realiza:".
+function extractRealiza(content) {
+  const map = new Map();
+  let actual = null;
+  for (const line of String(content || '').split('\n')) {
+    const h = line.match(/^\s*###\s*(\w+)/);
+    if (h) {
+      actual = h[1];
+      if (!map.has(actual)) map.set(actual, new Set());
+      continue;
+    }
+    if (actual) {
+      const r = line.match(/^\s*[-*]?\s*Realiza\s*:\s*(.+)$/i);
+      if (r) {
+        const re = /\bCU\d+\b/g;
+        let m;
+        while ((m = re.exec(r[1])) !== null) map.get(actual).add(m[0]);
+      }
+    }
+  }
+  return map;
+}
+
 // Identificadores de requisitos funcionales (RF1, RF2, ...) declarados.
 function extractRFIds(content) {
   const ids = new Set();
@@ -260,6 +292,28 @@ export function verificarCoherencia(modelos) {
         if (!rfDeclarados.has(rf)) {
           add('inconsistencia', 'media', `El caso de uso ${cu.id} referencia el requisito ${rf}, que no está declarado en los requisitos.`);
         }
+      }
+    }
+  }
+
+  // RV8. Trazabilidad entre casos de uso y clases (campo "Realiza:").
+  const cuDeclarados = extractCUIds(casos?.contenido);
+  if (cuDeclarados.size > 0) {
+    const clasesRealiza = extractRealiza(clases?.contenido);
+    for (const [clase, cus] of clasesRealiza) {
+      for (const cu of cus) {
+        if (!cuDeclarados.has(cu)) {
+          add('inconsistencia', 'media', `La clase "${clase}" referencia el caso de uso ${cu} en "Realiza:", que no está declarado en el modelo de casos de uso.`);
+        }
+      }
+    }
+    // Clases que no declaran "Realiza:" se reportan como advertencia.
+    const clasesLista = extractClasses(clases?.uml);
+    for (const c of clasesLista) {
+      const entry = [...clasesRealiza.keys()].find((k) => norm(k) === norm(c));
+      const cus = entry ? clasesRealiza.get(entry) : null;
+      if (!cus || cus.size === 0) {
+        add('advertencia', 'baja', `La clase "${c}" no declara casos de uso en el campo "Realiza:".`);
       }
     }
   }
