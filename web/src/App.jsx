@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { CircularProgress, Box } from '@mui/material';
 import { useAuth } from './context/AuthProvider';
 import Login from './pages/Login';
+import ResetPassword from './pages/ResetPassword';
 import Proyectos from './pages/Proyectos';
 import Wizard from './pages/Wizard';
 
@@ -21,6 +22,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route
         path="/"
         element={

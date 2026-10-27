@@ -25,6 +25,22 @@ export default function Login() {
     else navigate('/');
   };
 
+  const sendReset = async () => {
+    setError('');
+    setInfo('');
+    if (!email.trim()) {
+      setError('Introduce tu correo electrónico para enviar el enlace de recuperación.');
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`
+    });
+    setLoading(false);
+    if (error) setError(error.message);
+    else setInfo('Se ha enviado un enlace de recuperación a tu correo electrónico.');
+  };
+
   const signUp = async (e) => {
     e.preventDefault();
     setError('');
@@ -99,6 +115,17 @@ export default function Login() {
               <TextField label="Contraseña" type="password" fullWidth margin="normal" value={password} onChange={(e) => setPassword(e.target.value)} required />
               <Button type="submit" variant="contained" fullWidth size="large" sx={{ mt: 2.5 }} disabled={loading}>
                 {loading ? 'Procesando…' : 'Entrar'}
+              </Button>
+              <Button
+                type="button"
+                variant="text"
+                fullWidth
+                size="small"
+                sx={{ mt: 1.5, textTransform: 'none', color: '#93a0b0' }}
+                disabled={loading}
+                onClick={sendReset}
+              >
+                ¿Olvidaste tu contraseña?
               </Button>
             </form>
           ) : (
