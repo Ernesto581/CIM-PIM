@@ -3,5 +3,7 @@ export const API = {
   register: '/api/manager/public/register',
   proyectos: '/api/manager/proyectos',
   method: '/api/llm/method',
-  generate: '/api/llm/generate'
+  generate: '/api/llm/generate',
+  validate: '/api/llm/validate',
+  fix: '/api/llm/fix'
 };

@@ -46,4 +46,32 @@ async function generate({ system, user, temperature = 0.1 }) {
   return content;
 }
 
-module.exports = { generate, getModel: () => MODEL };
+// Streaming: devuelve un async iterable de fragmentos de texto.
+async function* stream({ system, user, temperature = 0.1 }) {
+  const openai = getClient();
+  const response = await openai.chat.completions.create(
+    {
+      model: MODEL,
+      reasoning_effort: REASONING_EFFORT,
+      temperature,
+      stream: true,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ]
+    },
+    {
+      headers: {
+        'User-Agent': 'jmda-cim-pim/4.0',
+        'x-opencode-session': randomUUID()
+      }
+    }
+  );
+
+  for await (const chunk of response) {
+    const delta = chunk.choices?.[0]?.delta?.content;
+    if (delta) yield delta;
+  }
+}
+
+module.exports = { generate, stream, getModel: () => MODEL };

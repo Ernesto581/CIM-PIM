@@ -66,6 +66,9 @@ export default function Wizard() {
   const [descripcion, setDescripcion] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [report, setReport] = useState('');
+  const [fixing, setFixing] = useState(false);
   const [mode, setMode] = useState('edit');
   const [snack, setSnack] = useState('');
 
@@ -145,22 +148,178 @@ export default function Wizard() {
       return;
     }
     setLoading(true);
+    setMarkdown('');
+    setUml('');
     try {
-      const { data } = await client.post(API.generate, {
-        requisitos: built.text,
-        etapa: stage.id
+      const token = localStorage.getItem('token');
+      const res = await fetch(API.generate, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ requisitos: built.text, etapa: stage.id })
       });
-      const content = data.data.markdown || '';
-      const umlCode = data.data.uml || '';
-      setMarkdown(content);
-      setUml(umlCode);
-      await persist(content, umlCode);
-      setSnack(`${stage.nombre} generado con IA`);
+      if (!res.ok || !res.body) {
+        let msg = 'Error al generar';
+        try {
+          const j = await res.json();
+          msg = j.error || msg;
+        } catch { /* ignore */ }
+        throw new Error(msg);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let full = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        for (const line of chunk.split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const evt = JSON.parse(line.slice(6));
+            if (evt.type === 'content') {
+              full += evt.text;
+              setMarkdown(full);
+            } else if (evt.type === 'done') {
+              const umlCode = evt.uml || '';
+              setUml(umlCode);
+              await persist(full, umlCode);
+              setSnack(`${stage.nombre} generado con IA`);
+            } else if (evt.type === 'error') {
+              throw new Error(evt.error);
+            }
+          } catch { /* ignore parse errors */ }
+        }
+      }
     } catch (e) {
-      setSnack(e.response?.data?.error || 'Error al generar con la IA');
+      setSnack(e.message || 'Error al generar con la IA');
     } finally {
       setLoading(false);
     }
+  };
+
+  const validate = async () => {
+    setValidating(true);
+    setReport('');
+    const modelos = stages.map((s) => {
+      const e = findEtapa(proyecto?.etapas, s.id);
+      return { id: s.id, nombre: s.nombre, contenido: e?.contenido || '', uml: e?.uml || '' };
+    });
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(API.validate, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ requisitos: getRequisitos(), modelos })
+      });
+      if (!res.ok || !res.body) {
+        let msg = 'Error al validar';
+        try {
+          const j = await res.json();
+          msg = j.error || msg;
+        } catch { /* ignore */ }
+        throw new Error(msg);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let full = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        for (const line of chunk.split('\\n')) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const evt = JSON.parse(line.slice(6));
+            if (evt.type === 'content') {
+              full += evt.text;
+              setReport(full);
+            }
+          } catch { /* ignore */ }
+        }
+      }
+    } catch (e) {
+      setReport(e.message || 'Error al validar');
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const fixModels = async () => {
+    setFixing(true);
+    try {
+      let current = proyecto;
+      for (const s of stages.filter((st) => st.id !== 'requisitos')) {
+        const etapaActual = findEtapa(current?.etapas, s.id);
+        const before = etapaActual?.contenido || '';
+        const built = entradaDe(s.id, current?.etapas, current?.descripcion || descripcion);
+        if (built.error) throw new Error(built.error);
+        const token = localStorage.getItem('token');
+        const res = await fetch(API.fix, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({
+            requisitos: built.text,
+            etapa: s.id,
+            informe: report,
+            actual: before
+          })
+        });
+        if (!res.ok || !res.body) {
+          let msg = 'Error al corregir';
+          try {
+            const j = await res.json();
+            msg = j.error || msg;
+          } catch { /* ignore */ }
+          throw new Error(msg);
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let full = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          for (const line of chunk.split('\\n')) {
+            if (!line.startsWith('data: ')) continue;
+            try {
+              const evt = JSON.parse(line.slice(6));
+              if (evt.type === 'content') full += evt.text;
+              else if (evt.type === 'done') {
+                const umlCode = evt.uml || '';
+                const etapa = { id: s.id, nombre: s.nombre, nivel: s.nivel, contenido: full, uml: umlCode };
+                const updated = { ...current, etapas: upsertEtapa(current.etapas, etapa) };
+                const { data } = await client.put(`${API.proyectos}/${id}`, updated);
+                current = data;
+                setProyecto(data);
+                if (s.id === stage?.id) {
+                  setMarkdown(full);
+                  setUml(umlCode);
+                }
+              }
+            } catch { /* ignore */ }
+          }
+        }
+      }
+      setSnack('Modelos corregidos según el informe de coherencia');
+    } catch (e) {
+      setSnack(e.message || 'Error al corregir');
+    } finally {
+      setFixing(false);
+    }
+  };
+
+  const getRequisitos = () => {
+    const req = findEtapa(proyecto?.etapas, 'requisitos');
+    return req?.contenido || proyecto?.descripcion || '';
   };
 
   if (!proyecto || stages.length === 0) {
@@ -326,6 +485,40 @@ export default function Wizard() {
               Exportar Markdown
             </Button>
           </Box>
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mt: 2, mb: 2 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Validación de coherencia
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+            <Button
+              variant="contained"
+              onClick={validate}
+              disabled={validating}
+            >
+              {validating ? 'Validando...' : 'Validar coherencia'}
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={fixModels}
+              disabled={fixing || !report}
+            >
+              {fixing ? 'Corrigiendo...' : 'Corregir modelos'}
+            </Button>
+          </Box>
+          {report && (
+            <TextField
+              fullWidth
+              multiline
+              minRows={8}
+              value={report}
+              InputProps={{ readOnly: true }}
+              sx={{ fontFamily: 'monospace' }}
+            />
+          )}
         </CardContent>
       </Card>
 

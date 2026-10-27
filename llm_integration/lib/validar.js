@@ -1,0 +1,250 @@
+// Verificación determinista de coherencia (portada desde web/lib/server/validar.js).
+// Reglas RV1-RV8.
+
+function norm(name) { return String(name || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+function stripQuotes(s) { const t = String(s || '').trim(); return t.replace(/^["']|["']$/g, '').trim(); }
+function cleanName(s) { return stripQuotes(s).replace(/\s*\{.*$/, '').trim(); }
+function splitAlias(token) {
+  const t = String(token || '').trim();
+  const m = t.match(/^(?:"([^"]+)"|([\w.\- ]+?))\s+as\s+(\w+)\s*$/i);
+  if (m) return { name: cleanName(m[1] ?? m[2] ?? ''), alias: m[3] };
+  return { name: cleanName(t), alias: null };
+}
+function uniqueNames(list) {
+  const map = new Map();
+  for (const n of list) { const k = norm(n); if (k && !map.has(k)) map.set(k, cleanName(n)); }
+  return [...map.values()];
+}
+function extractActors(uml) {
+  const out = [];
+  for (const line of String(uml || '').split('\n')) {
+    const t = line.trim();
+    const m = t.match(/^actor\s+(.+)$/i);
+    if (m) out.push(splitAlias(m[1]).name);
+  }
+  return uniqueNames(out);
+}
+function extractUseCases(uml) {
+  const out = [];
+  for (const line of String(uml || '').split('\n')) {
+    const t = line.trim();
+    const m = t.match(/^usecase\s+(.+)$/i);
+    if (m) { out.push(splitAlias(m[1])); continue; }
+    const g = t.match(/\(([^)]+)\)/g);
+    if (g) for (const gr of g) out.push({ name: cleanName(gr.slice(1, -1)), alias: null });
+  }
+  const seen = new Set();
+  const res = [];
+  for (const cu of out) {
+    const k = norm(cu.name);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    res.push(cu);
+  }
+  return res;
+}
+function extractClasses(uml) {
+  const out = [];
+  for (const line of String(uml || '').split('\n')) {
+    const t = line.trim();
+    const m = t.match(/^(?:abstract\s+)?(?:class|interface|enum|entity)\s+(.+)$/i);
+    if (m) out.push(splitAlias(m[1]).name);
+  }
+  return uniqueNames(out);
+}
+function extractSequence(uml) {
+  const decls = new Set();
+  const messages = new Set();
+  for (const line of String(uml || '').split('\n')) {
+    const t = line.trim();
+    const d = t.match(/^(?:actor|participant|boundary|control|entity|database|collections|queue)\s+(.+)$/i);
+    if (d) { decls.add(norm(splitAlias(d[1]).name)); continue; }
+    const c = t.match(/^(?:create|destroy)\s+(.+)$/i);
+    if (c) { messages.add(norm(cleanName(c[1]))); continue; }
+    const msg = t.match(/^(?:"([^"]+)"|([\w.\-]+))\s*(?:->>|-->|->|<<-|<--|<-)\s*(?:"([^"]+)"|([\w.\-]+))(?:\s*:.*)?$/);
+    if (msg) {
+      const left = msg[1] ?? msg[2];
+      const right = msg[3] ?? msg[4];
+      if (left) messages.add(norm(left));
+      if (right) messages.add(norm(right));
+    }
+  }
+  return { participants: new Set([...decls, ...messages]) };
+}
+function extractSequenceActors(uml) {
+  const out = [];
+  for (const line of String(uml || '').split('\n')) {
+    const t = line.trim();
+    const m = t.match(/^actor\s+(.+)$/i);
+    if (m) out.push(splitAlias(m[1]).name);
+  }
+  return uniqueNames(out);
+}
+function appearsInRelation(uml, cu) {
+  const keys = [norm(cu.name)];
+  if (cu.alias) keys.push(norm(cu.alias));
+  for (const line of String(uml || '').split('\n')) {
+    if (!/(-->|\.\.>|<\|--|--\|>|<--|->)/.test(line)) continue;
+    const nl = norm(line);
+    if (keys.some((k) => k && nl.includes(k))) return true;
+  }
+  return false;
+}
+function extractRFIds(content) {
+  const ids = new Set();
+  const re = /\bRF\d+\b/g;
+  let m;
+  while ((m = re.exec(String(content || ''))) !== null) ids.add(m[0]);
+  return ids;
+}
+function extractCoberturaCU(content) {
+  const cus = [];
+  let actual = null;
+  for (const line of String(content || '').split('\n')) {
+    if (/^\s*##\s+/.test(line) && !/^\s*###/.test(line)) { actual = null; continue; }
+    const h = line.match(/^\s*###\s*(CU\d+)\b/i);
+    if (h) { actual = { id: h[1].toUpperCase(), cubre: new Set() }; cus.push(actual); continue; }
+    if (actual) {
+      const cov = line.match(/^\s*[-*]?\s*Cubre\s*:\s*(.+)$/i);
+      if (cov) {
+        const re = /\bRF\d+\b/g;
+        let r;
+        while ((r = re.exec(cov[1])) !== null) actual.cubre.add(r[0]);
+      }
+    }
+  }
+  return cus;
+}
+function extractCUIds(content) {
+  const ids = new Set();
+  const re = /\bCU\d+\b/g;
+  let m;
+  while ((m = re.exec(String(content || ''))) !== null) ids.add(m[0]);
+  return ids;
+}
+function extractRealiza(content) {
+  const map = new Map();
+  let actual = null;
+  for (const line of String(content || '').split('\n')) {
+    const h = line.match(/^\s*###\s*(\w+)/);
+    if (h) {
+      actual = h[1];
+      if (!map.has(actual)) map.set(actual, new Set());
+      continue;
+    }
+    if (actual) {
+      const r = line.match(/^\s*[-*]?\s*Realiza\s*:\s*(.+)$/i);
+      if (r) {
+        const re = /\bCU\d+\b/g;
+        let m;
+        while ((m = re.exec(r[1])) !== null) map.get(actual).add(m[0]);
+      }
+    }
+  }
+  return map;
+}
+
+const ETAPAS_PLANTUML = { casos_uso: 'Modelo de Casos de Uso', clases: 'Modelo de Clases', secuencia: 'Modelo de Secuencia', actividades: 'Modelo de Actividades' };
+
+function verificarCoherencia(modelos) {
+  const byId = {};
+  for (const m of modelos || []) { if (m && m.id) byId[m.id] = m; }
+  const hallazgos = [];
+  const add = (tipo, nivel, mensaje) => hallazgos.push({ tipo, nivel, mensaje });
+
+  const req = byId['requisitos'];
+  if (!req || !(req.contenido || '').trim()) {
+    add('omision', 'alta', 'No se ha generado el documento de requisitos (Modelo de Requisitos en Texto).');
+  }
+  for (const [id, nombre] of Object.entries(ETAPAS_PLANTUML)) {
+    const e = byId[id];
+    if (!e || !(e.contenido || '').trim()) add('omision', 'alta', `El ${nombre} no tiene contenido en Markdown.`);
+    if (!e || !(e.uml || '').includes('@startuml')) add('omision', 'alta', `El ${nombre} no tiene diagrama PlantUML generado.`);
+  }
+
+  const casos = byId['casos_uso'];
+  const clases = byId['clases'];
+  const secuencia = byId['secuencia'];
+
+  const actoresCU = extractActors(casos?.uml);
+  const seqInfo = extractSequence(secuencia?.uml);
+
+  for (const a of actoresCU) {
+    if (!seqInfo.participants.has(norm(a))) add('advertencia', 'media', `El actor "${a}" (declarado en el diagrama de casos de uso) no aparece en el diagrama de secuencia.`);
+  }
+  const actoresSec = extractSequenceActors(secuencia?.uml);
+  const setActoresCU = new Set(actoresCU.map(norm));
+  for (const a of actoresSec) {
+    if (!setActoresCU.has(norm(a))) add('inconsistencia', 'media', `El actor "${a}" aparece en el diagrama de secuencia pero no está declarado en el diagrama de casos de uso.`);
+  }
+  for (const c of extractClasses(clases?.uml)) {
+    if (!seqInfo.participants.has(norm(c))) add('advertencia', 'media', `La clase "${c}" (del diagrama de clases) no participa en el diagrama de secuencia.`);
+  }
+  for (const cu of extractUseCases(casos?.uml)) {
+    if (!appearsInRelation(casos?.uml, cu)) add('advertencia', 'media', `El caso de uso "${cu.name}" no está conectado a ningún actor en el diagrama de casos de uso.`);
+  }
+
+  const rfDeclarados = extractRFIds(req?.contenido);
+  const cusCobertura = extractCoberturaCU(casos?.contenido);
+  if (rfDeclarados.size > 0 && cusCobertura.length === 0) {
+    add('advertencia', 'media', 'No se identificaron casos de uso con identificador (CU1, CU2, …) para verificar la trazabilidad con los requisitos.');
+  }
+  if (rfDeclarados.size > 0 && cusCobertura.length > 0) {
+    const rfCubiertos = new Set();
+    for (const cu of cusCobertura) for (const rf of cu.cubre) rfCubiertos.add(rf);
+    for (const rf of rfDeclarados) {
+      if (!rfCubiertos.has(rf)) add('omision', 'alta', `El requisito ${rf} no está cubierto por ningún caso de uso (falta de trazabilidad).`);
+    }
+    for (const cu of cusCobertura) {
+      for (const rf of cu.cubre) {
+        if (!rfDeclarados.has(rf)) add('inconsistencia', 'media', `El caso de uso ${cu.id} referencia el requisito ${rf}, que no está declarado en los requisitos.`);
+      }
+    }
+  }
+
+  const cuDeclarados = extractCUIds(casos?.contenido);
+  if (cuDeclarados.size > 0) {
+    const clasesRealiza = extractRealiza(clases?.contenido);
+    for (const [clase, cus] of clasesRealiza) {
+      for (const cu of cus) {
+        if (!cuDeclarados.has(cu)) add('inconsistencia', 'media', `La clase "${clase}" referencia el caso de uso ${cu} en "Realiza:", que no está declarado en el modelo de casos de uso.`);
+      }
+    }
+    const clasesLista = extractClasses(clases?.uml);
+    for (const c of clasesLista) {
+      const entry = [...clasesRealiza.keys()].find((k) => norm(k) === norm(c));
+      const cus = entry ? clasesRealiza.get(entry) : null;
+      if (!cus || cus.size === 0) add('advertencia', 'baja', `La clase "${c}" no declara casos de uso en el campo "Realiza:".`);
+    }
+  }
+
+  const porTipo = { inconsistencia: 0, omision: 0, advertencia: 0 };
+  for (const h of hallazgos) porTipo[h.tipo] += 1;
+  return { hallazgos, porTipo };
+}
+
+function formatearInforme(result) {
+  const { hallazgos, porTipo } = result;
+  const lineas = ['## Verificación determinista de consistencia', ''];
+  if (hallazgos.length === 0) {
+    lineas.push('No se detectaron omisiones ni inconsistencias mecánicas entre los artefactos mediante las reglas deterministas.');
+    return lineas.join('\n');
+  }
+  lineas.push(`Resultado: ${porTipo.omision} omisión(es), ${porTipo.inconsistencia} inconsistencia(s) y ${porTipo.advertencia} advertencia(s).`);
+  lineas.push('');
+  const grupos = [
+    ['omision', '### Omisiones detectadas (reglas)'],
+    ['inconsistencia', '### Inconsistencias detectadas (reglas)'],
+    ['advertencia', '### Advertencias (a revisar por el analista)']
+  ];
+  for (const [tipo, titulo] of grupos) {
+    const items = hallazgos.filter((h) => h.tipo === tipo);
+    if (items.length === 0) continue;
+    lineas.push(titulo);
+    for (const h of items) lineas.push(`- ${h.mensaje}`);
+    lineas.push('');
+  }
+  return lineas.join('\n');
+}
+
+module.exports = { verificarCoherencia, formatearInforme };
