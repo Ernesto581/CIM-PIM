@@ -37,7 +37,7 @@ export const METHOD = {
       nombre: 'Modelo de Secuencia',
       nivel: 'PIM',
       tipo: 'plantuml',
-      entrada: 'Casos de Uso y Clases',
+      entrada: 'Requisitos, casos de uso y clases',
       salida: 'Interacciones entre objetos y diagrama de secuencia en PlantUML',
       descripcion:
         'Se modela la interacción temporal entre los objetos para los escenarios más relevantes del sistema.'
@@ -47,7 +47,7 @@ export const METHOD = {
       nombre: 'Modelo de Actividades',
       nivel: 'PIM',
       tipo: 'plantuml',
-      entrada: 'Casos de Uso',
+      entrada: 'Requisitos, casos de uso y clases',
       salida: 'Flujos de trabajo y diagrama de actividades en PlantUML',
       descripcion:
         'Se modela el flujo de actividades y decisiones de los procesos clave del sistema.'

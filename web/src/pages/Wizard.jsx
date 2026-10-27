@@ -31,6 +31,7 @@ import PlantUMLViewer from '../components/PlantUMLViewer';
 import MarkdownView from '../components/MarkdownView';
 import { supabase } from '../lib/supabase';
 import { METHOD } from '../lib/method';
+import { buildStageInput } from '../lib/stageInput';
 
 async function authHeaders() {
   const { data } = await supabase.auth.getSession();
@@ -184,11 +185,8 @@ export default function Wizard() {
     return req?.contenido || proyecto?.descripcion || '';
   };
 
-  const requisitosInput = () => {
-    if (!stage) return '';
-    if (stage.id === 'requisitos') return proyecto?.descripcion || '';
-    return getRequisitos();
-  };
+  const entradaDe = (stageId, etapas, idea) =>
+    buildStageInput(stageId, stages, etapas, idea ?? descripcion);
 
   const saveEtapa = async (baseProyecto, s, contenido, umlCode, nuevaDescripcion) => {
     const etapa = { id: s.id, nombre: s.nombre, nivel: s.nivel, contenido, uml: umlCode };
@@ -230,6 +228,11 @@ export default function Wizard() {
   };
 
   const generate = async () => {
+    const built = entradaDe(stage?.id, proyecto?.etapas, descripcion);
+    if (built.error) {
+      setSnack(built.error);
+      return;
+    }
     setLoading(true);
     setElapsed(0);
     setMarkdown('');
@@ -241,7 +244,7 @@ export default function Wizard() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-        body: JSON.stringify({ requisitos: requisitosInput(), etapa: stage.id }),
+        body: JSON.stringify({ requisitos: built.text, etapa: stage.id }),
         signal: controller.signal
       });
 
@@ -319,11 +322,13 @@ export default function Wizard() {
         setFixingStage(s.nombre);
         const etapaActual = findEtapa(current?.etapas, s.id);
         const before = etapaActual?.contenido || '';
+        const built = entradaDe(s.id, current?.etapas, current?.descripcion || descripcion);
+        if (built.error) throw new Error(built.error);
         const res = await fetch('/api/fix', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
           body: JSON.stringify({
-            requisitos: getRequisitos(),
+            requisitos: built.text,
             etapa: s.id,
             informe: report,
             actual: before

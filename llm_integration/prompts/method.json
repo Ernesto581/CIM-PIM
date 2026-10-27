@@ -27,7 +27,7 @@
       "descripcion": "Se identifican los actores y los casos de uso del sistema, sus relaciones (asociación, inclusión, extensión y generalización) y se genera el diagrama de casos de uso.",
       "system": "Eres un analista de sistemas experto en UML. Identifica actores y casos de uso a partir de los requisitos, define sus relaciones y genera un diagrama de casos de uso correcto.",
       "format": "Responde en Markdown con las secciones:\n\n## Actores\n- Lista de actores con identificador y descripción corta, en el formato \"- A1: nombre — descripción\".\n\n## Casos de Uso\nPara cada caso de uso usa exactamente este formato:\n### CU1: Nombre del caso de uso\n- Actores: A1, A2\n- Cubre: RF1, RF3\n- Resumen: una línea\n\n## Relaciones\n- Lista de relaciones entre actores y casos de uso (incluir include/extend/generalización cuando aplique).\n\n## Diagrama PlantUML\nIncluye un único bloque de código marcado con ```plantuml que contenga el diagrama de casos de uso entre @startuml y @enduml. Usa la sintaxis correcta: actores con 'actor', casos de uso con paréntesis, y relaciones con -->, <|--, ..> según corresponda.",
-      "prompt": "A partir de los siguientes requisitos, identifica los actores y casos de uso del sistema y genera el diagrama de casos de uso.\n\nRequisitos:\n{requisitos}"
+      "prompt": "A partir del documento de requisitos siguiente, identifica los actores y casos de uso del sistema y genera el diagrama de casos de uso. Cubre cada requisito funcional. No inventes requisitos que no estén en el documento.\n\nArtefactos de entrada:\n{requisitos}"
     },
     {
       "id": "clases",
@@ -40,7 +40,7 @@
       "descripcion": "Se modela la estructura estática del sistema: clases de dominio, atributos, operaciones y relaciones (asociación, agregación, composición, herencia). Es el artefacto central del PIM.",
       "system": "Eres un analista de sistemas experto en UML y modelado orientado a objetos. Identifica las clases de dominio, sus atributos, métodos y relaciones, generando un diagrama de clases independiente de la plataforma (sin detalles de base de datos ni framework).",
       "format": "Responde en Markdown con las secciones:\n\n## Clases\nPara cada clase usa este formato:\n### NombreClase\n- Atributos: nombre: tipo, …\n- Operaciones: metodo(), …\n- Realiza: CU1, CU2\n\n## Relaciones\nLista de relaciones con su tipo (asociación, agregación, composición, herencia) y multiplicidad cuando sea posible.\n\n## Diagrama PlantUML\nIncluye un único bloque de código marcado con ```plantuml que contenga el diagrama de clases entre @startuml y @enduml. Declara cada clase con sus atributos y métodos, y las relaciones con las flechas de PlantUML (--, -->, --|>, --o, --*).",
-      "prompt": "A partir de los siguientes requisitos y casos de uso, elabora el diagrama de clases del sistema.\n\nRequisitos:\n{requisitos}"
+      "prompt": "A partir de los requisitos y del modelo de casos de uso siguientes, elabora el diagrama de clases. Respeta los identificadores RF y CU. El campo Realiza debe citar casos de uso que existan en la entrada. No inventes actores, requisitos ni casos de uso ausentes.\n\nArtefactos de entrada:\n{requisitos}"
     },
     {
       "id": "secuencia",
@@ -48,12 +48,12 @@
       "nivel": "PIM",
       "orden": 3,
       "tipo": "plantuml",
-      "entrada": "Casos de Uso y Clases",
+      "entrada": "Requisitos, casos de uso y clases",
       "salida": "Interacciones entre objetos y diagrama de secuencia en PlantUML",
       "descripcion": "Se modela la interacción temporal entre los objetos para los escenarios más relevantes del sistema.",
-      "system": "Eres un analista de sistemas experto en UML. A partir de los requisitos y las clases del sistema, identifica los escenarios principales y genera un diagrama de secuencia que muestre la interacción entre los participantes.",
+      "system": "Eres un analista de sistemas experto en UML. A partir de los casos de uso y las clases ya generados, identifica los escenarios principales y genera un diagrama de secuencia. Los participantes deben ser actores y clases declarados en esos artefactos.",
       "format": "Responde en dos secciones, ambas en Markdown:\n\n## Escenarios\nDescribe brevemente 1 o 2 escenarios principales (nombre, participantes y flujo de mensajes).\n\n## Diagrama PlantUML\nIncluye un único bloque de código marcado con ```plantuml que contenga el diagrama de secuencia entre @startuml y @enduml. Declara los participantes (actor, participant) y los mensajes con flechas -> y -->, incluyendo activate/deactivate cuando aporte claridad.",
-      "prompt": "A partir de los siguientes requisitos, genera el diagrama de secuencia para el escenario principal del sistema.\n\nRequisitos:\n{requisitos}"
+      "prompt": "A partir de los casos de uso y las clases siguientes, genera el diagrama de secuencia del escenario principal. Los participantes deben ser actores ya declarados y clases del modelo de clases. No introduzcas clases que no aparezcan en el modelo de clases.\n\nArtefactos de entrada:\n{requisitos}"
     },
     {
       "id": "actividades",
@@ -61,12 +61,12 @@
       "nivel": "PIM",
       "orden": 4,
       "tipo": "plantuml",
-      "entrada": "Casos de Uso",
+      "entrada": "Requisitos, casos de uso y clases",
       "salida": "Flujos de trabajo y diagrama de actividades en PlantUML",
       "descripcion": "Se modela el flujo de actividades y decisiones de los procesos clave del sistema.",
-      "system": "Eres un analista de sistemas experto en UML. A partir de los requisitos, identifica el proceso o flujo de trabajo principal del sistema y genera un diagrama de actividades.",
+      "system": "Eres un analista de sistemas experto en UML. A partir de los casos de uso y las clases ya generados, identifica el flujo principal y genera un diagrama de actividades. No inventes pasos ajenos a esos casos de uso.",
       "format": "Responde en dos secciones, ambas en Markdown:\n\n## Flujo de Actividades\nDescribe el proceso principal: actividades, decisiones y fin del flujo.\n\n## Diagrama PlantUML\nIncluye un único bloque de código marcado con ```plantuml que contenga el diagrama de actividades entre @startuml y @enduml. Usa start/stop, flechas -->, decisiones con if/else/endif y, si es útil, particiones con |nombre|.",
-      "prompt": "A partir de los siguientes requisitos, genera el diagrama de actividades del proceso principal del sistema.\n\nRequisitos:\n{requisitos}"
+      "prompt": "A partir de los casos de uso y las clases siguientes, genera el diagrama de actividades del flujo principal. Los pasos deben corresponder a los casos de uso de la entrada. No amplíes el alcance más allá de esos artefactos.\n\nArtefactos de entrada:\n{requisitos}"
     }
   ]
 }

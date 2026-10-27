@@ -28,6 +28,7 @@ import PlantUMLViewer from '../components/PlantUMLViewer';
 import MarkdownView from '../components/MarkdownView';
 import client from '../api/client';
 import { API } from '../constants/api';
+import { buildStageInput } from '../lib/stageInput';
 
 const NIVEL_COLOR = { CIM: 'primary', PIM: 'secondary', 'CIM-PIM': 'success' };
 
@@ -95,12 +96,8 @@ export default function Wizard() {
 
   const stage = stages[activeStep];
 
-  const requisitosInput = () => {
-    if (!stage) return '';
-    if (stage.id === 'requisitos') return proyecto?.descripcion || '';
-    const req = findEtapa(proyecto?.etapas, 'requisitos');
-    return req?.contenido || proyecto?.descripcion || '';
-  };
+  const entradaDe = (stageId, etapas, idea) =>
+    buildStageInput(stageId, stages, etapas, idea ?? descripcion);
 
   const persist = async (contenido, umlCode) => {
     const etapa = {
@@ -142,10 +139,15 @@ export default function Wizard() {
   };
 
   const generate = async () => {
+    const built = entradaDe(stage?.id, proyecto?.etapas, descripcion);
+    if (built.error) {
+      setSnack(built.error);
+      return;
+    }
     setLoading(true);
     try {
       const { data } = await client.post(API.generate, {
-        requisitos: requisitosInput(),
+        requisitos: built.text,
         etapa: stage.id
       });
       const content = data.data.markdown || '';

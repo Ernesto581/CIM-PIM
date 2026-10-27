@@ -38,9 +38,9 @@ export default async function handler(req, res) {
   }
 
   const system = `${stage.system}\n\n${stage.format}`;
-  const user = `Corrige el modelo "${stage.nombre}" teniendo en cuenta el informe de validación de coherencia. Mantén exactamente la estructura solicitada y corrige las inconsistencias, omisiones y errores señalados.
+  const user = `Corrige el modelo "${stage.nombre}" teniendo en cuenta el informe de validación de coherencia y los artefactos de las etapas anteriores. Mantén exactamente la estructura solicitada. No inventes actores, requisitos, casos de uso ni clases que no estén en esa entrada. Corrige las inconsistencias, omisiones y errores señalados.
 
-Requisitos:
+Artefactos de las etapas anteriores:
 ${requisitos}
 
 Modelo actual:

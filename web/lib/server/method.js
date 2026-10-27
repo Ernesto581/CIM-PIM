@@ -27,7 +27,7 @@ export const method = {
       format:
         'Responde en Markdown con las secciones:\n\n## Actores\n- Lista de actores con identificador y descripción corta, en el formato "- A1: nombre — descripción".\n\n## Casos de Uso\nPara cada caso de uso usa exactamente este formato:\n### CU1: Nombre del caso de uso\n- Actores: A1, A2\n- Cubre: RF1, RF3\n- Resumen: una línea\n\n## Relaciones\n- Lista de relaciones entre actores y casos de uso (incluir include/extend/generalización cuando aplique).\n\n## Diagrama PlantUML\nIncluye un único bloque de código marcado con ```plantuml que contenga el diagrama de casos de uso entre @startuml y @enduml.',
       prompt:
-        'A partir de los siguientes requisitos, identifica los actores y casos de uso del sistema y genera el diagrama de casos de uso.\n\nRequisitos:\n{requisitos}'
+        'A partir del documento de requisitos siguiente, identifica los actores y casos de uso del sistema y genera el diagrama de casos de uso. Cubre cada requisito funcional. No inventes requisitos que no estén en el documento.\n\nArtefactos de entrada:\n{requisitos}'
     },
     {
       id: 'clases',
@@ -39,7 +39,7 @@ export const method = {
       format:
         'Responde en Markdown con las secciones:\n\n## Clases\nPara cada clase usa este formato:\n### NombreClase\n- Atributos: nombre: tipo, …\n- Operaciones: metodo(), …\n- Realiza: CU1, CU2\n\n## Relaciones\nLista de relaciones con su tipo (asociación, agregación, composición, herencia) y multiplicidad cuando sea posible.\n\n## Diagrama PlantUML\nIncluye un único bloque de código marcado con ```plantuml que contenga el diagrama de clases entre @startuml y @enduml.',
       prompt:
-        'A partir de los siguientes requisitos y casos de uso, elabora el diagrama de clases del sistema.\n\nRequisitos:\n{requisitos}'
+        'A partir de los requisitos y del modelo de casos de uso siguientes, elabora el diagrama de clases. Respeta los identificadores RF y CU. El campo Realiza debe citar casos de uso que existan en la entrada. No inventes actores, requisitos ni casos de uso ausentes.\n\nArtefactos de entrada:\n{requisitos}'
     },
     {
       id: 'secuencia',
@@ -47,11 +47,11 @@ export const method = {
       nivel: 'PIM',
       tipo: 'plantuml',
       system:
-        'Eres un analista de sistemas experto en UML. A partir de los requisitos y las clases del sistema, identifica los escenarios principales y genera un diagrama de secuencia que muestre la interacción entre los participantes.',
+        'Eres un analista de sistemas experto en UML. A partir de los casos de uso y las clases ya generados, identifica los escenarios principales y genera un diagrama de secuencia. Los participantes deben ser actores y clases declarados en esos artefactos.',
       format:
         'Responde en Markdown con las secciones:\n\n## Escenarios\nDescribe brevemente 1 o 2 escenarios principales.\n\n## Diagrama PlantUML\nIncluye un único bloque de código marcado con ```plantuml que contenga el diagrama de secuencia entre @startuml y @enduml.',
       prompt:
-        'A partir de los siguientes requisitos, genera el diagrama de secuencia para el escenario principal del sistema.\n\nRequisitos:\n{requisitos}'
+        'A partir de los casos de uso y las clases siguientes, genera el diagrama de secuencia del escenario principal. Los participantes deben ser actores ya declarados y clases del modelo de clases. No introduzcas clases que no aparezcan en el modelo de clases.\n\nArtefactos de entrada:\n{requisitos}'
     },
     {
       id: 'actividades',
@@ -59,11 +59,11 @@ export const method = {
       nivel: 'PIM',
       tipo: 'plantuml',
       system:
-        'Eres un analista de sistemas experto en UML. A partir de los requisitos, identifica el proceso o flujo de trabajo principal del sistema y genera un diagrama de actividades.',
+        'Eres un analista de sistemas experto en UML. A partir de los casos de uso y las clases ya generados, identifica el flujo principal y genera un diagrama de actividades. No inventes pasos ajenos a esos casos de uso.',
       format:
         'Responde en Markdown con las secciones:\n\n## Flujo de Actividades\nDescribe el proceso principal.\n\n## Diagrama PlantUML\nIncluye un único bloque de código marcado con ```plantuml que contenga el diagrama de actividades entre @startuml y @enduml.',
       prompt:
-        'A partir de los siguientes requisitos, genera el diagrama de actividades del proceso principal del sistema.\n\nRequisitos:\n{requisitos}'
+        'A partir de los casos de uso y las clases siguientes, genera el diagrama de actividades del flujo principal. Los pasos deben corresponder a los casos de uso de la entrada. No amplíes el alcance más allá de esos artefactos.\n\nArtefactos de entrada:\n{requisitos}'
     }
   ]
 };
